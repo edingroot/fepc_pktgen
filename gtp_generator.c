@@ -61,9 +61,9 @@ int main(int argc, char **argv)
 
 	bind(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
 
-	if (argc != 3)
+	if (argc != 4)
 	{
-		printf("usage: gtp_generator <GTP_Header_Server IP> <Destination IP>\n");
+		printf("usage: gtp_generator <GTP_Header_Server IP> <Destination IP> <TEID>\n");
 		return -1;
 	}
 
@@ -73,6 +73,7 @@ int main(int argc, char **argv)
 		bzero(&line, sizeof(line));
 		printf("[INFO] GTP Header Server IP = %s\n",argv[1]);
 		printf("[INFO] Dest. IP = %s\n",argv[2]);
+		printf("[INFO] TEID = %s\n",argv[3]);
 		printf("Waiting for data...\n");
 		n = recvfrom(sockfd, recvbuffer,2000, 0, NULL, NULL);
 		printf("Received pkt size: %d\n",n);
@@ -81,18 +82,18 @@ int main(int argc, char **argv)
 		printf("Before modification: %s\n",(inet_ntoa(ip_header->ip_dst)));
 
 		inet_aton(argv[2],&ip_header->ip_dst.s_addr);
-		printf("After modification: %s\n",(inet_ntoa(ip_header->ip_dst)));
+		printf("After modification: %s\n\n",(inet_ntoa(ip_header->ip_dst)));
 
 		sendbuffer = calloc(2000,sizeof(char));
 		gtp_header* gtpuheader = calloc(1,sizeof(gtp_header));
 		gtpuheader->flag = 0x30;
 		gtpuheader->type = 255;
 		gtpuheader->length = htons(n+sizeof(gtp_header));
-		gtpuheader->teid = htonl(1);
+		gtpuheader->teid = htonl(atol(argv[3]));
 		memcpy(sendbuffer,gtpuheader, sizeof(gtp_header));		
 		memcpy(sendbuffer+sizeof(gtp_header), recvbuffer, n);
 			
-		printf("after read and adding header:\n");
+		// printf("after read and adding header:\n");
 		udpfd = socket(AF_INET, SOCK_DGRAM, 0);
 		bzero(&remoteaddr, sizeof(remoteaddr));
 		remoteaddr.sin_family = AF_INET;

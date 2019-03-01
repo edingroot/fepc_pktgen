@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 
 	sendfd = socket(AF_INET, SOCK_DGRAM, 0);
 	while (1) {
-		sleep(0.1);
+		sleep(1);
 		*sendline = "111111111111111111111111111111111";
 		sendto(sendfd, sendline, strlen(sendline), 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
 		printf("packet send\n");
