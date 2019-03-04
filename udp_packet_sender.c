@@ -37,11 +37,17 @@ int main(int argc, char **argv)
 	local.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	sendfd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	for(int i=0;i<1500;++i){
+		sendline[i] = '1';
+	}
+
 	while (1) {
-		sleep(1);
-		*sendline = "111111111111111111111111111111111";
+		nanosleep(10000);
+		// *sendline = "111111111111111111111111111111111";
 		sendto(sendfd, sendline, strlen(sendline), 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
-		printf("packet send\n");
+		// for(int i=0;i<10000;++i);
+		// printf("packet send\n");
 		// recvfd = socket(AF_INET, SOCK_DGRAM, 0);
 		// bind(recvfd,(struct sockaddr*)&local,sizeof(local));	
 		// recvfrom(recvfd,recvline,1500,0,(struct sockaddr*)&cliaddr, &cliaddrlen);
