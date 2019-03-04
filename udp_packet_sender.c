@@ -18,13 +18,13 @@
 #include	<stdint.h>
 int main(int argc, char **argv)
 {
-	int sendfd,recvfd;
+	int sendfd;
 	struct sockaddr_in servaddr,local,cliaddr;
 	socklen_t cliaddrlen = sizeof(cliaddr);
-	char sendline[1500],recvline[1500];
-	if (argc != 3)
+	char sendline[1450];
+	if (argc != 4)
 	{
-		printf("usage: udp_packet_sender <gtp_server ip address> <gtp_server port>\n");
+		printf("usage: udp_packet_sender <gtp_server ip address> <gtp_server port> <sleep interval(nano_sec)>\n");
 		return -1;
 	}
 	bzero(&servaddr, sizeof(servaddr));
@@ -39,19 +39,13 @@ int main(int argc, char **argv)
 
 	sendfd = socket(AF_INET, SOCK_DGRAM, 0);
 
-	for(int i=0;i<1500;++i){
+	for(int i=0;i<1436;++i){
 		sendline[i] = '1';
 	}
 
 	while (1) {
-		nanosleep(10000);
-		// *sendline = "111111111111111111111111111111111";
-		sendto(sendfd, sendline, strlen(sendline), 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
-		// for(int i=0;i<10000;++i);
-		// printf("packet send\n");
-		// recvfd = socket(AF_INET, SOCK_DGRAM, 0);
-		// bind(recvfd,(struct sockaddr*)&local,sizeof(local));	
-		// recvfrom(recvfd,recvline,1500,0,(struct sockaddr*)&cliaddr, &cliaddrlen);
+		nanosleep(atoi(argv[3]));
+		sendto(sendfd, sendline, 1436, 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
 	}
 	exit(0);
 }
