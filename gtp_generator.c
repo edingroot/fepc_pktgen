@@ -47,6 +47,12 @@ struct ip {
 
 int main(int argc, char **argv)
 {
+	if (argc != 5)
+	{
+		printf("usage: gtp_generator <bind port> <sgw ip> <remote destination ip> <teid>\n");
+		return -1;
+	}
+
 	int sockfd,udpfd,n;
 	
 	struct sockaddr_in servaddr,remoteaddr;
@@ -57,15 +63,10 @@ int main(int argc, char **argv)
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family      = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port        = htons(5202);
+	servaddr.sin_port        = htons(atoi(argv[1]));
 
 	bind(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr));
 
-	if (argc != 4)
-	{
-		printf("usage: gtp_generator <sgw ip> <remote destination ip> <teid>\n");
-		return -1;
-	}
 
 	gtp_header* gtpuheader = calloc(1,sizeof(gtp_header));
 	// recvbuffer = calloc(2000,sizeof(char));
@@ -75,27 +76,27 @@ int main(int argc, char **argv)
 	remoteaddr.sin_family = AF_INET;
 	remoteaddr.sin_port = htons(2152);
 	
-	inet_pton(AF_INET, argv[1], &remoteaddr.sin_addr);
+	inet_pton(AF_INET, argv[2], &remoteaddr.sin_addr);
 
 	gtpuheader->flag = 0x30;
 	gtpuheader->type = 255;
 	gtpuheader->length = htons(n+sizeof(gtp_header));
-	gtpuheader->teid = htonl(atol(argv[3]));
+	gtpuheader->teid = htonl(atol(argv[4]));
 	for(;;)
 	{
 		
 		// bzero(&line, sizeof(line));
-		// printf("[INFO] GTP Header Server IP = %s\n",argv[1]);
-		// printf("[INFO] Dest. IP = %s\n",argv[2]);
-		// printf("[INFO] TEID = %s\n",argv[3]);
+		// printf("[INFO] GTP Header Server IP = %s\n",argv[2]);
+		// printf("[INFO] Dest. IP = %s\n",argv[3]);
+		// printf("[INFO] TEID = %s\n",argv[4]);
 		// printf("Waiting for data...\n");
 		n = recvfrom(sockfd, recvbuffer,1600, 0, NULL, NULL);
-		// printf("Received pkt size: %d\n",n);
+		printf("Received pkt size: %d\n",n);
 
 		struct ip* ip_header = (struct ip*) recvbuffer;
 		// printf("Before modification: %s\n",(inet_ntoa(ip_header->ip_dst)));
 
-		inet_aton(argv[2],&ip_header->ip_dst.s_addr);
+		inet_aton(argv[3],&ip_header->ip_dst.s_addr);
 		// printf("After modification: %s\n\n",(inet_ntoa(ip_header->ip_dst)));
 
 		// sendbuffer = calloc(2000,sizeof(char));

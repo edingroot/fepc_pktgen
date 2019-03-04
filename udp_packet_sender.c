@@ -22,14 +22,15 @@ int main(int argc, char **argv)
 	struct sockaddr_in servaddr,local,cliaddr;
 	socklen_t cliaddrlen = sizeof(cliaddr);
 	char sendline[1500],recvline[1500];
-	if (argc != 2)
+	if (argc != 3)
 	{
-		printf("usage: udp_packet_sender <IPaddress>\n");
+		printf("usage: udp_packet_sender <gtp_server ip address> <gtp_server port>\n");
 		return -1;
 	}
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(5202);
+	// servaddr.sin_port = htons(5202);
+	servaddr.sin_port = htons(atoi(argv[2]));
 	inet_pton(AF_INET, argv[1], &servaddr.sin_addr);
 
 	local.sin_family = AF_INET;
