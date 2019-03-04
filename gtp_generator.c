@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 
 	if (argc != 4)
 	{
-		printf("usage: gtp_generator <GTP_Header_Server IP> <Destination IP> <TEID>\n");
+		printf("usage: gtp_generator <sgw ip> <remote destination ip> <teid>\n");
 		return -1;
 	}
 
