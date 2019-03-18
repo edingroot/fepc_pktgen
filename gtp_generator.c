@@ -45,6 +45,42 @@ struct ip {
 	struct	in_addr ip_src,ip_dst;	/* source and dest address */
 };
 
+typedef struct ip_h
+{
+    uint8_t version;
+    uint8_t tos;
+    uint16_t tot_len;
+    uint16_t id;
+    uint16_t frag_off;
+    uint8_t ttl;
+    uint8_t proto;
+    uint16_t chksum;
+    uint32_t src;
+    uint32_t dst;
+
+} IP;
+
+uint16_t calculate_ip_chksum(IP *ip)
+{
+    uint16_t *buf = (uint16_t *) ip;
+    uint32_t sum = 0;
+    uint16_t checksum = 0;
+
+    int counter = (ip->version & 0xF) * 4;
+    while (counter > 1)
+     {
+            sum += *buf++;
+            counter -= 2;
+     }
+
+    if (counter == 1)
+            sum += * (uint8_t *) buf;
+
+    while (sum >> 16)
+            sum = (sum & 0xFFFF) + (sum >> 16);
+    checksum = ~sum;
+    return checksum;
+}
 int main(int argc, char **argv)
 {
 	if (argc != 5)
@@ -91,14 +127,23 @@ int main(int argc, char **argv)
 		// printf("Waiting for data...\n");
 		n = recvfrom(sockfd, recvbuffer,1600, 0, NULL, NULL);
 		printf("Received pkt size: %d\n",n);
+		// printf("%s\n",recvbuffer);
 		gtpuheader->length = htons(n+sizeof(gtp_header));
 
 		struct ip* ip_header = (struct ip*) recvbuffer;
 		// printf("Before modification: %s\n",(inet_ntoa(ip_header->ip_dst)));
 
+		// inet_aton("",&ip_header->ip_src.s_addr);
+		
+		// printf("SRC Address: %s\n\n",(inet_ntoa(ip_header->ip_src)));
 		inet_aton(argv[3],&ip_header->ip_dst.s_addr);
 		// printf("After modification: %s\n\n",(inet_ntoa(ip_header->ip_dst)));
-
+		// printf("strlen(recvbuffer) = %d\n",n);
+		// printf("IHL = %d\n",ip_header->ip_len);
+		ip_header->ip_sum = 0;
+		ip_header->ip_sum = calculate_ip_chksum(recvbuffer);
+		// printf("ip_checksum = %x\n",ip_header->ip_sum);
+		
 		// sendbuffer = calloc(2000,sizeof(char));
 		
 		
@@ -107,7 +152,7 @@ int main(int argc, char **argv)
 			
 		// printf("after read and adding header:\n");
 		
-		//printf("%d\n",setsockopt(udpfd,SOL_SOCKET,SO_BINDTODEVICE,"enp0s9",6));
+		// printf("%d\n",setsockopt(udpfd,SOL_SOCKET,SO_BINDTODEVICE,"enp0s9",6));
 		sendto(udpfd,sendbuffer,n+sizeof(gtp_header),0,(struct sockaddr*)&remoteaddr,sizeof(remoteaddr));
 		
 	}
