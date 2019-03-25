@@ -17,7 +17,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define RECV_BUF 20480
+#define RECV_BUF 90000
 
 typedef struct gtp_header_t {
     uint8_t flag;
@@ -83,7 +83,7 @@ uint16_t calculate_ip_chksum(IP *ip) {
 }
 
 int main(int argc, char **argv) {
-    int sockfd, udpfd, n;
+    int sockfd, udpfd, n, rv;
     struct sockaddr_in servaddr, remoteaddr;
     struct in_addr remote_dst_ip;
     char recvbuffer[RECV_BUF];
@@ -117,13 +117,20 @@ int main(int argc, char **argv) {
     udpfd = socket(AF_INET, SOCK_DGRAM, 0);
     // printf("%d\n", setsockopt(udpfd, SOL_SOCKET, SO_BINDTODEVICE, "enp0s9", 6));
 
+    // Connect sender datagram socket to destination address
+    if ((rv = connect(udpfd, (struct sockaddr *) &remoteaddr, sizeof(remoteaddr))) != 0) {
+        fprintf(stderr, "connect: %s\n", gai_strerror(rv));
+        close(udpfd);
+        return 0;
+    }
+
     // Static GTP header
     gtp_header gtpuheader;
     gtpuheader.flag = 0x30;
     gtpuheader.type = 255;
     gtpuheader.teid = htonl(atol(argv[4]));
 
-    printf("[INFO] Raw socket server listening on port %d, recv buffer size = %d\n", atoi(argv[1]), RECV_BUF);
+    printf("[INFO] UDP packet listener listening on port %d, recv buffer size = %d\n", atoi(argv[1]), RECV_BUF);
     printf("[INFO] GTP destination IP = %s\n", argv[2]);
     printf("[INFO] Remote destination IP = %s\n", argv[3]);
     printf("[INFO] GTP TEID = %s\n", argv[4]);
@@ -150,7 +157,8 @@ int main(int argc, char **argv) {
         memcpy(sendbuffer, &gtpuheader, sizeof(gtp_header));
         memcpy(sendbuffer + sizeof(gtp_header), recvbuffer, n);
 
-        sendto(udpfd, sendbuffer, n + sizeof(gtp_header), 0, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr));
+        // sendto(udpfd, sendbuffer, n + sizeof(gtp_header), 0, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr));
+        write(udpfd, sendbuffer, n + sizeof(gtp_header));
     }
 
     close(udpfd);
