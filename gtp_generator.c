@@ -90,22 +90,22 @@ int main(int argc, char **argv) {
     char sendbuffer[RECV_BUF + sizeof(gtp_header)];
 
     if (argc != 5) {
-        printf("Usage: gtp_generator <udp_server_port> <gtp_dst_ip> <remote_dst_ip> <gtp_teid>\n");
+        printf("Usage: gtp_generator <udp_listener_port> <gtp_dst_ip> <remote_dst_ip> <gtp_teid>\n");
         return -1;
     }
 
-    printf("[INFO] GTP Header Server IP = %s\n", argv[2]);
-    printf("[INFO] Dest. IP = %s\n", argv[3]);
-    printf("[INFO] TEID = %s\n", argv[4]);
-
-    // Socket for RX (udp server)
+    // Socket for RX (raw socket server)
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(atoi(argv[1]));
 
-    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-    bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+    // sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
+    sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
+        printf("An error occurred while binding udp server socket, errno=%d\n", errno);
+        return 1;
+    }
 
     // Socket for TX (gtp sender)
     bzero(&remoteaddr, sizeof(remoteaddr));
@@ -123,9 +123,14 @@ int main(int argc, char **argv) {
     gtpuheader.type = 255;
     gtpuheader.teid = htonl(atol(argv[4]));
 
+    printf("[INFO] Raw socket server listening on port %d, recv buffer size = %d\n", atoi(argv[1]), RECV_BUF);
+    printf("[INFO] GTP destination IP = %s\n", argv[2]);
+    printf("[INFO] Remote destination IP = %s\n", argv[3]);
+    printf("[INFO] GTP TEID = %s\n", argv[4]);
+
     while (1) {
         n = recvfrom(sockfd, recvbuffer, RECV_BUF, 0, NULL, NULL);
-        printf("Received pkt size: %d\n", n);
+        // printf("Received pkt size: %d\n", n);
         gtpuheader.length = htons(n + sizeof(gtp_header));
 
         struct ip *ip_header = (struct ip *)recvbuffer;
