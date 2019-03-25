@@ -1,0 +1,7 @@
+.vscode
+*.o
+
+gtp_generator
+udp_packet_sender
+echo_server
+
