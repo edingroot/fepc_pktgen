@@ -85,12 +85,12 @@ uint16_t calculate_ip_chksum(IP *ip) {
 int main(int argc, char **argv) {
     int sockfd, udpfd, n, rv;
     struct sockaddr_in servaddr, remoteaddr;
-    struct in_addr remote_dst_ip;
+    struct in_addr user_src_ip, user_dst_ip;
     char recvbuffer[RECV_BUF];
     char sendbuffer[RECV_BUF + sizeof(gtp_header)];
 
-    if (argc != 5) {
-        printf("Usage: gtp_generator <udp_listener_port> <gtp_dst_ip> <remote_dst_ip> <gtp_teid>\n");
+    if (argc != 6) {
+        printf("Usage: gtp_generator <udp_listener_port> <gtp_dst_ip> <up_src_ip> <up_dst_ip> <gtp_teid>\n");
         return -1;
     }
 
@@ -100,8 +100,8 @@ int main(int argc, char **argv) {
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(atoi(argv[1]));
 
-    // sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
+    // sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
         printf("An error occurred while binding udp server socket, errno=%d\n", errno);
         return 1;
@@ -112,10 +112,13 @@ int main(int argc, char **argv) {
     remoteaddr.sin_family = AF_INET;
     remoteaddr.sin_port = htons(2152);
     inet_pton(AF_INET, argv[2], &remoteaddr.sin_addr);
-    inet_aton(argv[3], &remote_dst_ip);
     
     udpfd = socket(AF_INET, SOCK_DGRAM, 0);
     // printf("%d\n", setsockopt(udpfd, SOL_SOCKET, SO_BINDTODEVICE, "enp0s9", 6));
+
+    // User plane ip header
+    inet_aton(argv[3], &user_src_ip);
+    inet_aton(argv[4], &user_dst_ip);
 
     // Connect sender datagram socket to destination address
     if ((rv = connect(udpfd, (struct sockaddr *) &remoteaddr, sizeof(remoteaddr))) != 0) {
@@ -128,12 +131,13 @@ int main(int argc, char **argv) {
     gtp_header gtpuheader;
     gtpuheader.flag = 0x30;
     gtpuheader.type = 255;
-    gtpuheader.teid = htonl(atol(argv[4]));
+    gtpuheader.teid = htonl(atol(argv[5]));
 
     printf("[INFO] UDP packet listener listening on port %d, recv buffer size = %d\n", atoi(argv[1]), RECV_BUF);
     printf("[INFO] GTP destination IP = %s\n", argv[2]);
-    printf("[INFO] Remote destination IP = %s\n", argv[3]);
-    printf("[INFO] GTP TEID = %s\n", argv[4]);
+    printf("[INFO] User plane source IP = %s\n", argv[3]);
+    printf("[INFO] User plane destination IP = %s\n", argv[4]);
+    printf("[INFO] GTP TEID = %s\n", argv[5]);
 
     while (1) {
         n = recvfrom(sockfd, recvbuffer, RECV_BUF, 0, NULL, NULL);
@@ -145,7 +149,8 @@ int main(int argc, char **argv) {
         // inet_aton("", &ip_header->ip_src.s_addr);
         // printf("SRC Address: %s\n\n", (inet_ntoa(ip_header->ip_src)));
 
-        memcpy(&ip_header->ip_dst.s_addr, &remote_dst_ip.s_addr, sizeof(remote_dst_ip.s_addr));
+        memcpy(&ip_header->ip_src.s_addr, &user_src_ip.s_addr, sizeof(user_src_ip.s_addr));
+        memcpy(&ip_header->ip_dst.s_addr, &user_dst_ip.s_addr, sizeof(user_dst_ip.s_addr));
         // printf("After modification: %s\n\n", (inet_ntoa(ip_header->ip_dst)));
         // printf("strlen(recvbuffer) = %d\n", n);
         // printf("IHL = %d\n", ip_header->ip_len);
