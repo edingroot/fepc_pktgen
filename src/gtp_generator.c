@@ -83,7 +83,7 @@ uint16_t calculate_ip_chksum(IP *ip) {
 }
 
 int main(int argc, char **argv) {
-    int sockfd, udpfd, n, rv;
+    int rawfd, udpfd, gtpfd, n, rv;
     struct sockaddr_in servaddr, remoteaddr;
     struct in_addr user_src_ip, user_dst_ip;
     char recvbuffer[RECV_BUF];
@@ -98,13 +98,19 @@ int main(int argc, char **argv) {
     bzero(&servaddr, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(atoi(argv[1]));
 
-    sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-    // sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
-        printf("An error occurred while binding udp server socket, errno=%d\n", errno);
+    rawfd = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
+    if (bind(rawfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
+        printf("An error occurred while binding raw socket server, errno=%d\n", errno);
+        printf("Root permission is needed for binding raw socket.\n");
         return 1;
+    }
+
+    // Socket for RX (udp socket server) for preventing ICMP Port Unreachable reply
+    servaddr.sin_port = htons(atoi(argv[1]));
+    udpfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (bind(udpfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
+        printf("An error occurred while binding udp server, errno=%d, skip.\n", errno);
     }
 
     // Socket for TX (gtp sender)
@@ -112,18 +118,17 @@ int main(int argc, char **argv) {
     remoteaddr.sin_family = AF_INET;
     remoteaddr.sin_port = htons(2152);
     inet_pton(AF_INET, argv[2], &remoteaddr.sin_addr);
-    
-    udpfd = socket(AF_INET, SOCK_DGRAM, 0);
-    // printf("%d\n", setsockopt(udpfd, SOL_SOCKET, SO_BINDTODEVICE, "enp0s9", 6));
+    gtpfd = socket(AF_INET, SOCK_DGRAM, 0);
+    // printf("%d\n", setsockopt(gtpfd, SOL_SOCKET, SO_BINDTODEVICE, "enp0s9", 6));
 
     // User plane ip header
     inet_aton(argv[3], &user_src_ip);
     inet_aton(argv[4], &user_dst_ip);
 
     // Connect sender datagram socket to destination address
-    if ((rv = connect(udpfd, (struct sockaddr *) &remoteaddr, sizeof(remoteaddr))) != 0) {
+    if ((rv = connect(gtpfd, (struct sockaddr *) &remoteaddr, sizeof(remoteaddr))) != 0) {
         fprintf(stderr, "connect: %s\n", gai_strerror(rv));
-        close(udpfd);
+        close(gtpfd);
         return 0;
     }
 
@@ -140,7 +145,7 @@ int main(int argc, char **argv) {
     printf("[INFO] GTP TEID = %s\n", argv[5]);
 
     while (1) {
-        n = recvfrom(sockfd, recvbuffer, RECV_BUF, 0, NULL, NULL);
+        n = recvfrom(rawfd, recvbuffer, RECV_BUF, 0, NULL, NULL);
         // printf("Received pkt size: %d\n", n);
         gtpuheader.length = htons(n + sizeof(gtp_header));
 
@@ -162,10 +167,12 @@ int main(int argc, char **argv) {
         memcpy(sendbuffer, &gtpuheader, sizeof(gtp_header));
         memcpy(sendbuffer + sizeof(gtp_header), recvbuffer, n);
 
-        // sendto(udpfd, sendbuffer, n + sizeof(gtp_header), 0, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr));
-        write(udpfd, sendbuffer, n + sizeof(gtp_header));
+        // sendto(gtpfd, sendbuffer, n + sizeof(gtp_header), 0, (struct sockaddr *)&remoteaddr, sizeof(remoteaddr));
+        write(gtpfd, sendbuffer, n + sizeof(gtp_header));
     }
 
+    close(rawfd);
     close(udpfd);
+    close(gtpfd);
     return 0;
 }
