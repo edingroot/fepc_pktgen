@@ -104,25 +104,26 @@ unsigned int build_udp_packet(struct sockaddr_in src_addr, struct sockaddr_in ds
     // Do NOT use udph->len instead of length.
     // udph->len is in big endian
     memcpy(pseudo_packet + sizeof(struct pseudo_iphdr), udph, length);
-    udph->check = checksum(pseudo_packet, sizeof(struct pseudo_iphdr) + length);
+    // udph->check = udp_checksum(udp_packet, length, src_addr.sin_addr.s_addr, dst_addr.sin_addr.s_addr);
+    udph->check = 0; // no cksum
+    // printf("check %x\n", udph->check);
 
     return length;
 }
 
-void send_udp_packet(int raw_sock, struct sockaddr_in src_addr, struct sockaddr_in dst_addr, uint8_t *data, unsigned int data_size)
-{
-    unsigned int packet_size;
-    unsigned int ip_payload_size;
-    uint8_t packet[MAX_ETH_LEN];
+// void send_udp_packet(int raw_sock, struct sockaddr_in src_addr, struct sockaddr_in dst_addr, uint8_t *data, unsigned int data_size)
+// {
+//     unsigned int packet_size;
+//     unsigned int ip_payload_size;
+//     uint8_t packet[MAX_ETH_LEN];
 
-    memset(packet, 0, MAX_ETH_LEN);
-    ip_payload_size = build_udp_packet(src_addr, dst_addr, packet + sizeof(struct iphdr), data, data_size);
+//     memset(packet, 0, MAX_ETH_LEN);
+//     ip_payload_size = build_udp_packet(src_addr, dst_addr, packet + sizeof(struct iphdr), data, data_size);
+//     packet_size = build_ip_packet(src_addr.sin_addr, dst_addr.sin_addr, IPPROTO_UDP, packet, packet + sizeof(struct iphdr), ip_payload_size);
 
-    packet_size = build_ip_packet(src_addr.sin_addr, dst_addr.sin_addr, IPPROTO_UDP, packet, packet + sizeof(struct iphdr), ip_payload_size);
-
-    if (sendto(raw_sock, packet, packet_size, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0)
-    {
-        perror("sendto");
-        exit(1);
-    }
-}
+//     if (sendto(raw_sock, packet, packet_size, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0)
+//     {
+//         perror("sendto");
+//         exit(1);
+//     }
+// }

@@ -22,10 +22,10 @@ static void catch_function(int signo);
 int main(int argc, char **argv)
 {
     int raw_sock;
-    uint8_t packet[MAX_ETH_LEN];
+    // uint8_t packet[MAX_ETH_LEN];
     uint8_t udp_packet[MAX_ETH_LEN];
-    uint8_t data[MAX_DATA_SIZE];
-    char *sending_data;
+    // uint8_t data[MAX_DATA_SIZE];
+    unsigned char *sending_data;
     unsigned int packet_size;
     unsigned int data_size;
     struct sockaddr_in src_addr;
@@ -62,27 +62,29 @@ int main(int argc, char **argv)
 
     printf("[+] Build UDP packet...\n");
     packet_size = build_udp_packet(src_addr, dst_addr, 
-                                   udp_packet + sizeof(struct iphdr), data, data_size);
+                                   udp_packet + sizeof(struct iphdr), sending_data, data_size);
 
     printf("[+] Build IP packet...\n");
-    packet_size = build_ip_packet(src_addr.sin_addr, dst_addr.sin_addr,
-                                  IPPROTO_UDP, udp_packet, udp_packet + sizeof(struct iphdr), packet_size);
+    packet_size = build_ip_packet(src_addr.sin_addr, dst_addr.sin_addr, IPPROTO_UDP, 
+                                  udp_packet, udp_packet + sizeof(struct iphdr), packet_size);
 
     // Create a raw socket
     if ((raw_sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
     {
         perror("socket");
+        free(sending_data);
         exit(1);
     }
 
-    printf("Sending UDP packets to %s:%d with data size %d, packet size %d\n",
+    printf("[+] Sending UDP packets to %s:%d with data size %d, packet size %d...\n",
            argv[2], atoi(argv[3]), data_size, packet_size);
     while (!stop)
     {
-        printf("[+] Send UDP packet...\n");
+        // printf("[+] Send UDP packet...\n");
         if (sendto(raw_sock, udp_packet, packet_size, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0)
         {
             perror("sendto");
+            free(sending_data);
             exit(1);
         }
     }
