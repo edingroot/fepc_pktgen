@@ -1,39 +1,43 @@
-#include <arpa/inet.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <ifaddrs.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <signal.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/uio.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include <ctype.h>
+#include <stdint.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <linux/if_ether.h>
+
+#include "udp.h"
+
+#define MAX_ETH_LEN 9700
+#define MAX_DATA_SIZE 9600
 
 int stop = 0;
 
 static void catch_function(int signo);
 
-int main(int argc, char **argv) {
-    int sendfd;
-    struct sockaddr_in destaddr;
-    int block_size = 1458; // default packet size 1500
-    char *pktbuf;
+int main(int argc, char **argv)
+{
+    int raw_sock;
+    uint8_t packet[MAX_ETH_LEN];
+    uint8_t udp_packet[MAX_ETH_LEN];
+    uint8_t data[MAX_DATA_SIZE];
+    char *sending_data;
+    unsigned int packet_size;
+    unsigned int data_size;
+    struct sockaddr_in src_addr;
+    struct sockaddr_in dst_addr;
 
     // Parse args
-    if (argc < 3) {
-        printf("usage: udp_packet_sender <dest_ip> <dest_port> <block_size>\n");
+    if (argc < 5)
+    {
+        printf("Usages:\n"
+               "  udp_packet_sender <src_ip> <dest_ip> <dest_port> <data_size>\n"
+               "  udp_packet_sender - <dest_ip> <dest_port> <data_size>\n");
         return 1;
-    } else if (argc == 4) {
-        block_size = atoi(argv[3]);
     }
 
     // Register signal handler
@@ -42,32 +46,56 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    src_addr.sin_family = AF_INET;
+    src_addr.sin_port = htons(2048);
+    if (argv[1][0] != '-')
+        inet_aton(argv[1], &src_addr.sin_addr);
+
+    dst_addr.sin_family = AF_INET;
+    dst_addr.sin_port = htons(atoi(argv[3]));
+    inet_aton(argv[2], &dst_addr.sin_addr);
+
     // Allocate and fill the packet buffer
-    pktbuf = malloc(block_size);
-    memset(pktbuf, 1, block_size);
+    data_size = atoi(argv[4]);
+    sending_data = malloc(data_size);
+    memset(sending_data, 1, data_size);
 
-    // Dest addr info
-    bzero(&destaddr, sizeof(destaddr));
-    destaddr.sin_family = AF_INET;
-    destaddr.sin_port = htons(atoi(argv[2]));
-    inet_pton(AF_INET, argv[1], &destaddr.sin_addr);
+    printf("[+] Build UDP packet...\n");
+    packet_size = build_udp_packet(src_addr, dst_addr, 
+                                   udp_packet + sizeof(struct iphdr), data, data_size);
 
-    // Create socket
-    sendfd = socket(AF_INET, SOCK_DGRAM, 0);
+    printf("[+] Build IP packet...\n");
+    packet_size = build_ip_packet(src_addr.sin_addr, dst_addr.sin_addr,
+                                  IPPROTO_UDP, udp_packet, udp_packet + sizeof(struct iphdr), packet_size);
 
-    printf("Sending UDP packets to %s:%d with block size %d\n", argv[1], atoi(argv[2]), block_size);
-
-    while (!stop) {
-        sendto(sendfd, pktbuf, block_size, 0, (struct sockaddr *)&destaddr, sizeof(destaddr));
+    // Create a raw socket
+    if ((raw_sock = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+    {
+        perror("socket");
+        exit(1);
     }
 
-    free(pktbuf);
+    printf("Sending UDP packets to %s:%d with data size %d, packet size %d\n",
+           argv[2], atoi(argv[3]), data_size, packet_size);
+    while (!stop)
+    {
+        printf("[+] Send UDP packet...\n");
+        if (sendto(raw_sock, udp_packet, packet_size, 0, (struct sockaddr *)&dst_addr, sizeof(dst_addr)) < 0)
+        {
+            perror("sendto");
+            exit(1);
+        }
+    }
+
+    free(sending_data);
     return 0;
 }
 
-static void catch_function(int signo) {
-    if (signo == SIGINT) {
-        printf("Stopped by SIGINT.\n");
+static void catch_function(int signo)
+{
+    if (signo == SIGINT)
+    {
+        printf("\nStopped by SIGINT.\n");
         stop = 1;
     }
 }
