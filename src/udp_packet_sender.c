@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netinet/ip.h>
 #include <linux/if_ether.h>
+#include <unistd.h>
 
 #include "udp.h"
 
@@ -28,6 +29,7 @@ int main(int argc, char **argv)
     unsigned char *sending_data;
     unsigned int packet_size;
     unsigned int data_size;
+    unsigned int sleep_us = 0;
     struct sockaddr_in src_addr;
     struct sockaddr_in dst_addr;
 
@@ -35,9 +37,11 @@ int main(int argc, char **argv)
     if (argc < 5)
     {
         printf("Usages:\n"
-               "  udp_packet_sender <src_ip> <dest_ip> <dest_port> <data_size>\n"
-               "  udp_packet_sender - <dest_ip> <dest_port> <data_size>\n");
+               "  udp_packet_sender <src_ip> <dest_ip> <dest_port> <data_size> [<sleepus>]\n"
+               "  udp_packet_sender -        <dest_ip> <dest_port> <data_size> [<sleepus>]\n");
         return 1;
+    } else if (argc == 6) {
+        sleep_us = atoi(argv[5]);
     }
 
     // Register signal handler
@@ -76,8 +80,8 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    printf("[+] Sending UDP packets to %s:%d with data size %d, packet size %d...\n",
-           argv[2], atoi(argv[3]), data_size, packet_size);
+    printf("[+] Sending UDP packets to %s:%d with data size %d, packet size %d, sleep %dus...\n",
+           argv[2], atoi(argv[3]), data_size, packet_size, sleep_us);
     while (!stop)
     {
         // printf("[+] Send UDP packet...\n");
@@ -87,6 +91,9 @@ int main(int argc, char **argv)
             free(sending_data);
             exit(1);
         }
+
+        if (sleep_us != 0)
+            usleep(sleep_us);
     }
 
     free(sending_data);
